@@ -40,11 +40,13 @@ const BTH = {
   0x03: { n: "humidity", t: uint16, f: 0.01, u: "%" },
   0x05: { n: "illuminance", t: uint24, f: 0.01 },
   0x21: { n: "motion", t: uint8 },
+  0x2c: { n: "vibration", t: uint8 },
   0x2d: { n: "window", t: uint8 },
   0x2e: { n: "humidity", t: uint8, u: "%" },
   0x3a: { n: "button", t: uint8 },
   0x3f: { n: "rotation", t: int16, f: 0.1 },
   0x45: { n: "temperature", t: int16, f: 0.1, u: "tC" },
+  0x40: { n: "distance_mm", t: uint16, u: "mm" },
 };
 
 function getByteSize(type) {
@@ -53,6 +55,16 @@ function getByteSize(type) {
   if (type === uint24 || type === int24) return 3;
   //impossible as advertisements are much smaller;
   return 255;
+}
+
+function bufToHex(buffer) {
+  let out = "";
+  for (let i = 0; i < buffer.length; i++) {
+    let b = buffer.at(i).toString(16);
+    if (b.length === 1) b = "0" + b;
+    out += b;
+  }
+  return out;
 }
 
 // functions for decoding and unpacking the service data from Shelly BLU devices
@@ -109,9 +121,12 @@ const BTHomeDecoder = {
     let _bth;
     let _value;
     while (buffer.length > 0) {
-      _bth = BTH[buffer.at(0)];
+      const objId = buffer.at(0);
+      _bth = BTH[objId];
       if (typeof _bth === "undefined") {
-        console.log("BTH: Unknown type");
+        console.log(
+          "BTH: Unknown type 0x" + objId.toString(16) + " payload " + bufToHex(buffer)
+        );
         break;
       }
       buffer = buffer.slice(1);
@@ -153,8 +168,8 @@ const SCAN_OPTION = {
 // Push BLE devices to MQTT
 function pushToMQ(addr, message) {
   if (!MQTT.isConnected()) return false; // Check the MQTT status
-
-  MQTT.publish(addr, message);
+  
+  MQTT.publish("shelly/" + addr, message);
 
   return true
 }
